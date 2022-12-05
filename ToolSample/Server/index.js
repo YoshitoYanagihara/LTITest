@@ -21,8 +21,11 @@ app.post("/login", (req, res) => {
 })
 
 app.post("/app", (req, res) => {
-  console.log(req.body)
-  res.send(req.body)
+  const jwt = req.body.id_token.split(".")
+  const payload = JSON.parse(Buffer.from(jwt[1], "base64").toString())
+  res.json({
+    payload,
+  })
 })
 
 app.listen(3000, () => {
