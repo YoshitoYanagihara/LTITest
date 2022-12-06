@@ -47,6 +47,42 @@ const fetchAccessToken = async (scopes) => {
   return response.data.access_token
 }
 
+// 参考： https://note.kiriukun.com/entry/20191124-iso-8601-in-javascript
+const toISOStringSec = (dt) => {
+	const pad = (val, len) => {
+		let p = '';
+		for (let i = 0; i < len; ++i) {
+			p += '0';
+		}
+		return (p + String(val)).slice(-1 * len);
+	};
+	const year = dt.getFullYear();
+	const month = dt.getMonth() + 1;
+	const days = dt.getDate();
+	const hours = dt.getHours();
+	const minutes = dt.getMinutes();
+	const seconds = dt.getSeconds();
+  const millisec = dt.getMilliseconds();
+	return `${year}-${pad(month, 2)}-${pad(days, 2)}T${pad(hours, 2)}:${pad(minutes, 2)}:${pad(seconds, 2)}.${pad(millisec, 3)}Z`;
+}
+
+// 参考: https://locutus.io/php/strings/substr_replace/
+const substrReplace = (str, replace, start, length) =>  {
+  if (start < 0) {
+    start = start + str.length
+  }
+  length = length !== undefined ? length : str.length
+  if (length < 0) {
+    length = length + str.length - start
+  }
+  return [
+    str.slice(0, start),
+    replace.substr(0, length),
+    replace.slice(length),
+    str.slice(start + length)
+  ].join('')
+}
+
 app.post("/app", async (req, res) => {
   const jwt = req.body.id_token.split(".")
   const payload = JSON.parse(Buffer.from(jwt[1], "base64").toString())
@@ -55,23 +91,22 @@ app.post("/app", async (req, res) => {
   try {
     const accessToken = await fetchAccessToken(scopes)
     const request = {
-      timestamp: new Date().toISOString(),
-      scoreGiven: 10,
+      timestamp: toISOStringSec(new Date()),
+      scoreGiven: Math.floor(Math.random() * 100),
       scoreMaximum: 100,
       comment: "後で職員室に来なさい",
       activityProgress: "Completed",
       gradingProgress: "FullyGraded",
       userId: payload.sub,
     }
-    const response = await axios.get(endpoint.lineitem, {
+    endpoint.lineitem = substrReplace(endpoint.lineitem, "/scores", endpoint.lineitem.indexOf("?"), 0)
+    await axios.post(endpoint.lineitem, request, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        Accept: "*/*",
-        "Content-Type": "application/json",
+        Accept: "application/json",
+        "Content-Type": "application/vnd.ims.lis.v1.score+json",
       },
-      data: new URLSearchParams(request).toString(),
     })
-    console.log(response.status)
   } catch (error) {
     res.send(error)
     return
